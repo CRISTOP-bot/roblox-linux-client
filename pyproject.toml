@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "roblox-linux-launcher"
+version = "0.3.0"
+description = "Community Linux frontend/orchestrator for a Roblox-compatible runtime"
+requires-python = ">=3.10"
+[project.scripts]
+roblox-launcher = "roblox_launcher.main:main"
+[tool.setuptools.packages.find]
+include = ["roblox_launcher*"]
