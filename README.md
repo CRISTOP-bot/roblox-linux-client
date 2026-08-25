@@ -1,47 +1,74 @@
-# Roblox Launcher para Linux
+# Roblox Linux Client
 
-Frontend/orquestador comunitario inspirado en la experiencia de Sober. **No es un cliente oficial de Roblox ni recrea Sober**: usa un runtime compatible ya instalado, con prioridad para Sober mediante Flatpak (`org.vinegarhq.Sober`). No contiene código propietario, credenciales, bypasses ni exploits, y no instala software automáticamente.
+Launcher comunitario de escritorio para Linux, inspirado en la experiencia de Sober. Sober permanece como runtime principal (`org.vinegarhq.Sober`); este proyecto no lo recrea, no incluye código propietario, no usa Wine/`xdg-open`/navegador como mecanismo principal y no instala software automáticamente.
 
-## Arquitectura
+## Flujo
 
 ```text
-GUI / CLI → detección de Sober → URI roblox://experiences/start?placeId=… → Sober → Roblox → experiencia
+GTK4/CLI → Flatpak/Sober → roblox://experiences/start?placeId=… → Roblox
 ```
 
-El launcher no usa `xdg-open`, Wine ni navegador como mecanismo principal. Invoca directamente Flatpak/Sober con una lista de argumentos segura. El formato `roblox://experiences/start?placeId=...` se usa como destino de experiencia; si una versión del runtime cambia su interfaz, la integración queda aislada en `roblox_launcher/runtime.py`.
+La integración invoca Flatpak directamente con argumentos separados. El destino `roblox://experiences/start?placeId=...` se mantiene aislado en `runtime.py` y se basa en el mecanismo observable/documentado por el runtime; no se inventa un subcomando de Sober.
+
+## Estructura
+
+```text
+launcher.py
+roblox_launcher/
+├── main.py          # CLI
+├── gui.py           # GTK4, páginas y tareas en segundo plano
+├── runtime.py       # Flatpak/Sober y ciclo de vida del proceso
+├── launcher.py      # validación y URI
+├── api.py           # metadatos públicos opcionales
+├── config.py        # migración y persistencia
+├── models.py
+└── thumbnails.py    # caché con límite de tamaño
+data/org.community.RobloxLauncher.desktop
+tests/test_launcher.py
+pyproject.toml
+install.sh
+```
 
 ## Dependencias
 
-- Python 3.10+
-- GTK4 y PyGObject (`python3-gi` y el paquete GTK4 de tu distribución)
-- Flatpak
-- Sober instalado y configurado por el usuario: `org.vinegarhq.Sober`
+Python 3.10+, GTK4, PyGObject y Flatpak. Sober debe estar instalado por el usuario. La consulta de metadatos/thumbnails es best-effort, tiene timeout, no usa login y nunca impide iniciar por Place ID.
 
-El launcher solo detecta el runtime. No ejecuta instalaciones ni actualizaciones automáticas.
-
-## Uso desde el código
-
-```bash
-python3 launcher.py
-python3 launcher.py --place 123456789
-python3 launcher.py --uri 'roblox://placeId=123456789'
-python3 launcher.py --detect
-python3 launcher.py --verbose
-python3 launcher.py --version
-```
-
-`--detect` funciona incluso si GTK no está instalado y muestra Flatpak/Sober. La ventana muestra los estados `Runtime detectado`, `Preparando`, `Iniciando`, `Jugando`, `Cerrado` y `Error`. La información de la experiencia se solicita de forma opcional y sin autenticación; si la API no responde, el juego aún puede iniciarse.
-
-## Instalación de desarrollo
+## Instalación y ejecución
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e .
-roblox-launcher --detect
+roblox-launcher
+roblox-launcher --place 123456789
+roblox-launcher --uri 'roblox://placeId=123456789'
 ```
 
-Para integrar el menú de aplicaciones:
+También existe `./install.sh`, que instala el paquete para el usuario y copia el `.desktop`. Si el ejecutable no aparece, añade `~/.local/bin` al `PATH`.
+
+## CLI y diagnóstico
+
+```bash
+roblox-launcher --detect
+roblox-launcher --diagnose
+roblox-launcher --history
+roblox-launcher --favorite 123456789
+roblox-launcher --verbose --place 123456789
+roblox-launcher --version
+```
+
+La GUI tiene Inicio, Favoritos, Recientes, Ajustes y Diagnóstico. Los datos se guardan en `~/.config/roblox-launcher/config.json`; el formato anterior con `recent` se migra sin perderlo. Los thumbnails se almacenan en `~/.cache/roblox-launcher/thumbnails` y se limitan a 512 KiB por imagen.
+
+El estado `Jugando` es aproximado: indica que el proceso Sober sigue activo. No afirma que Roblox terminó de cargar porque el runtime no expone necesariamente ese estado.
+
+## Tests
+
+```bash
+python -m unittest discover -s tests -v
+python3 launcher.py --detect
+```
+
+## Desktop y empaquetado
 
 ```bash
 mkdir -p ~/.local/share/applications
@@ -49,32 +76,8 @@ cp data/org.community.RobloxLauncher.desktop ~/.local/share/applications/
 update-desktop-database ~/.local/share/applications 2>/dev/null || true
 ```
 
-## Estructura
+El `.desktop` no registra automáticamente `roblox://` para evitar bucles. Para Flatpak futuro, empaquetar solo esta GUI y declarar GTK4/PyGObject; Sober debe seguir siendo un runtime separado. Para AppImage incluir dependencias GTK, pero no Roblox/Sober. La modularidad también permite crear después un paquete `.deb`.
 
-```text
-roblox-launcher/
-├── launcher.py
-├── roblox_launcher/
-│   ├── main.py       # CLI y entrada
-│   ├── gui.py        # GTK4
-│   ├── runtime.py    # detección y proceso Sober
-│   ├── launcher.py   # validación y URI
-│   ├── api.py        # metadatos opcionales
-│   ├── config.py     # recientes/favoritos
-│   └── models.py
-├── data/
-├── tests/
-├── pyproject.toml
-└── LICENSE
-```
+## Seguridad y alcance
 
-## Empaquetado futuro
-
-- **Flatpak:** crear un manifiesto con runtime GTK4, permisos de red solo si se desea mostrar metadatos y acceso al servicio de sesión; Sober debe seguir siendo una dependencia/runtime separado, no copiarse dentro de este proyecto.
-- **AppImage:** empaquetar Python, PyGObject y las bibliotecas GTK compatibles con linuxdeploy; no incluir Roblox ni Sober.
-
-## Limitaciones
-
-La aplicación puede detectar que el proceso de Sober fue creado y cuándo termina, pero no puede garantizar que Roblox terminó de cargar una experiencia sin una API de estado expuesta por el runtime. El estado `Jugando` significa que el proceso sigue activo.
-
-MIT. Roblox y Sober pertenecen a sus respectivos autores; este proyecto no está afiliado con ellos.
+No hay credenciales, cookies, tokens, login, exploits, cheats, bypasses, modificaciones del cliente ni evasión de sistemas de seguridad. Roblox y Sober son marcas/proyectos de sus respectivos autores; este launcher no está afiliado con ellos.
