@@ -12,7 +12,11 @@ def parse_target(place: str|None, uri: str|None) -> tuple[str, str]:
     if place: return place, experience_uri(place)
     if not uri: return "", "roblox://"
     parts = urlsplit(uri)
-    if parts.scheme.lower() != "roblox": raise ValueError("La URL debe usar roblox://.")
+    if parts.scheme.lower() in {"http", "https"}:
+        match = re.search(r"/games/(\\d+)", parts.path)
+        if match: return match.group(1), experience_uri(match.group(1))
+        raise ValueError("La URL web no contiene un ID de experiencia válido.")
+    if parts.scheme.lower() != "roblox": raise ValueError("La URL debe usar roblox:// o una URL de experiencia de Roblox.")
     query = parse_qs(parts.query)
     value = (query.get("placeId") or query.get("placeid") or [None])[0]
     if value is None and parts.netloc.startswith("placeId="): value = parts.netloc.split("=", 1)[1]
