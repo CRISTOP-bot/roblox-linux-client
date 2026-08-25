@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Roblox Linux Launcher
+Comment=Launcher comunitario de Roblox para Linux
+Exec=roblox-linux
+Terminal=true
+Type=Application
+Categories=Game;
+Keywords=Roblox;Games;
