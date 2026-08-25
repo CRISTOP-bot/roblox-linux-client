@@ -4,7 +4,7 @@ from .config import Config
 from .launcher import parse_target
 from .models import Experience
 from .runtime import RuntimeManager
-VERSION = "0.4.0"
+VERSION = "2.0.0"
 
 def main(argv=None):
     p=argparse.ArgumentParser(description="Frontend comunitario de Roblox para Linux mediante Sober")
